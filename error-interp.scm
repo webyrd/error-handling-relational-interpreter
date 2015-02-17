@@ -61,9 +61,11 @@
            (== `(car ,e) exp)
            (not-in-envo 'car env)
            (conde
-             ((fresh (v2)
-                (absento 'ERROR val)
-                (eval-expo e env `(,val . ,v2))))
+             ((fresh (v1 v2)
+                (absento 'ERROR `(,v1 . ,v2))
+                (=/= 'closure val)
+                (== v1 val)
+                (eval-expo e env `(,v1 . ,v2))))
              ((== 'ERROR val)
               (conde
                 ((eval-expo e env 'ERROR))
@@ -75,9 +77,11 @@
            (== `(cdr ,e) exp)
            (not-in-envo 'cdr env)
            (conde
-             ((fresh (v1)
-                (absento 'ERROR val)
-                (eval-expo e env `(,v1 . ,val))))
+             ((fresh (v1 v2)
+                (absento 'ERROR `(,v1 . ,v2))
+                (=/= 'closure v1)
+                (== v2 val)
+                (eval-expo e env `(,v1 . ,v2))))
              ((== 'ERROR val)
               (conde
                 ((eval-expo e env 'ERROR))
@@ -87,6 +91,7 @@
                    (eval-expo e env v))))))))))))
 
 #|
+;; original relational interpreter, without explicit error handling
 (define eval-expo
   (lambda (exp env val)
     (fresh ()
@@ -146,6 +151,7 @@
             ((=/= y x) (lookupo x rest t))))))))
 
 #|
+;; original lookupo, without error handling
 (define lookupo
   (lambda (x env t)
     (fresh (rest y v)
@@ -154,6 +160,45 @@
         ((== y x) (== v t))
         ((=/= y x) (lookupo x rest t))))))
 |#
+
+(test "0a"
+  (run* (q) (eval-expo '(lambda (x) x) '() q))
+  '((closure x x ())))
+
+(test "0b"
+  (run 5 (q) (eval-expo q '() '(closure x x ())))
+  '((lambda (x) x)
+    (((lambda (_.0) _.0) (lambda (x) x))
+     (=/= ((_.0 ERROR)) ((_.0 closure)))
+     (sym _.0))
+    ((car (cons (lambda (x) x) '_.0))
+     (absento (ERROR _.0) (closure _.0)))
+    ((cdr (cons '_.0 (lambda (x) x)))
+     (absento (ERROR _.0) (closure _.0)))
+    ((car (cons (lambda (x) x) (lambda (_.0) _.1)))
+     (=/= ((_.0 ERROR)) ((_.0 closure)))
+     (sym _.0)
+     (absento (ERROR _.1) (closure _.1)))))
+
+(test "0c"
+  (run* (q) (eval-expo '(car (lambda (x) x)) '() q))
+  '(ERROR))
+
+(test "0d"
+  (run* (q) (eval-expo '(cdr (lambda (x) x)) '() q))
+  '(ERROR))
+
+(test "0e"
+  (run* (q) (eval-expo '(car (cdr (lambda (x) x))) '() q))
+  '(ERROR))
+
+(test "0f"
+  (run* (q) (eval-expo '(cdr (cdr (lambda (x) x))) '() q))
+  '(ERROR))
+
+(test "0g"
+  (run* (q) (eval-expo '(cdr (car (lambda (x) x))) '() q))
+  '(ERROR))
 
 (test "1"
   (run* (q)
